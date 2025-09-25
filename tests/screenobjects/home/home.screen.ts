@@ -1,4 +1,5 @@
 import { ListClanPopupComponent } from "./components/index.js";
+import { Step } from "../../decorators/step.decorator.js";
 
 export class HomeScreen {
     private listClanPopup: ListClanPopupComponent;
@@ -27,6 +28,7 @@ export class HomeScreen {
         return this.listClanPopup;
     }
 
+    @Step("Open Create Clan Modal")
     public async openCreateClanModal() {
         await this.listClanPopup.waitForVisible();
         return this.listClanPopup.openCreateClanModal();

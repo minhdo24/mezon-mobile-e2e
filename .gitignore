@@ -21,3 +21,6 @@ chromeDriver
 
 .sessions/
 .mailslurp/
+allure-report/
+allure-results/
+reports/

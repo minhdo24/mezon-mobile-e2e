@@ -1,19 +1,41 @@
-import { allure } from "../integrations/wdio-allure-reporter/core/allure.js";
+import { Allure } from "../integrations/wdio-allure-reporter/core/allure.js";
 
-type Ctx = { hs?: { rootSel: string } };
-type Step<C = Ctx> = (c: C) => Promise<C>;
+export function Step(name: string) {
+    return function <T, A extends any[], R>(
+        value: (this: T, ...args: A) => Promise<R> | R,
+        _context: ClassMethodDecoratorContext<
+            T,
+            (this: T, ...args: A) => Promise<R> | R
+        >
+    ) {
+        const original = value;
 
-const step =
-    <C = Ctx>(name: string, f: Step<C>): Step<C> =>
-    async (c: C) => {
-        let out = c;
-        await allure.step(name, async () => {
-            out = await f(c);
-        });
-        return out;
+        async function wrapped(this: T, ...args: A): Promise<R> {
+            return await Allure.using(async (allure) => {
+                return await allure.step(name, async (allure) => {
+                    try {
+                        return await original.apply(this, args);
+                    } catch (err: any) {
+                        try {
+                            allure.addAttachment?.(
+                                "Error",
+                                JSON.stringify(
+                                    {
+                                        message: err?.message,
+                                        stack: err?.stack,
+                                    },
+                                    null,
+                                    2
+                                ),
+                                "application/json"
+                            );
+                        } catch {}
+                        throw err;
+                    }
+                });
+            });
+        }
+
+        return wrapped;
     };
-
-const pipe = async <C = Ctx>(c: C, ...ss: Step<C>[]) => {
-    for (const s of ss) c = await s(c);
-    return c;
-};
+}

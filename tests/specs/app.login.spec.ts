@@ -42,6 +42,7 @@ describe("Mezon Login (Native)", function () {
                 );
                 return smallAvatarPath;
             });
+            await sleep(2000);
             await createClanModal.createClan();
         });
     });

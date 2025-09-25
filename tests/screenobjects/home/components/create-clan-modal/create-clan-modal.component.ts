@@ -4,8 +4,9 @@ import {
     MezonButtonUIObject,
 } from "../../../../component-ui-object/index.js";
 import { Upload } from "../../../../utils/index.js";
-import Media from "../../../../utils/media.js";
+import { Media, sleep } from "../../../../utils/index.js";
 import path from "path";
+import { Step } from "../../../../decorators/index.js";
 
 export class CreateClanModalComponent {
     private DEFAULT_TIMEOUT = 15000;
@@ -40,27 +41,32 @@ export class CreateClanModalComponent {
         return el;
     }
 
+    @Step("Is Modal Visible")
     async isModalVisible(timeout = this.DEFAULT_TIMEOUT): Promise<boolean> {
         const modal = await this.show(SELECTOR.CLOSE_BUTTON, timeout);
         return await modal.isDisplayed();
     }
 
+    @Step("Close")
     async close(): Promise<CreateClanModalComponent> {
         const closeButton = await this.show(SELECTOR.CLOSE_BUTTON);
         await closeButton.click();
         return this;
     }
 
+    @Step("Set Clan Name")
     async setClanName(name: string): Promise<CreateClanModalComponent> {
         await this.mezonInput.setInput(name);
         return this;
     }
 
+    @Step("Get Clan Name")
     async getClanName(): Promise<string> {
         const input = await this.mezonInput.input;
         return await input.getValue();
     }
 
+    @Step("Upload Image")
     async uploadImage(
         callbackUploadImage: (upload: Upload) => Promise<string>
     ): Promise<CreateClanModalComponent> {
@@ -69,6 +75,7 @@ export class CreateClanModalComponent {
         return this;
     }
 
+    @Step("Upload Image From Library")
     async uploadImageFromLibrary(
         localImagePath: string
     ): Promise<CreateClanModalComponent> {
@@ -82,6 +89,7 @@ export class CreateClanModalComponent {
         return this;
     }
 
+    @Step("Create Clan")
     async createClan(): Promise<void> {
         await this.mezonButton.click();
     }
@@ -94,6 +102,7 @@ export class CreateClanModalComponent {
         return this.mezonButton.button;
     }
 
+    @Step("Wait For Preview")
     async waitForPreview(timeout = this.DEFAULT_TIMEOUT) {
         const el = await this.show(SELECTOR.PREVIEW, timeout);
         return el;

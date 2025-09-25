@@ -1,5 +1,6 @@
 import { SELECTOR } from "./constants/index.js";
 import { CreateClanModalComponent } from "../create-clan-modal/index.js";
+import { Step } from "../../../../decorators/step.decorator.js";
 
 export class ListClanPopupComponent {
     private DEFAULT_TIMEOUT = 15000;
@@ -38,12 +39,14 @@ export class ListClanPopupComponent {
         return $(SELECTOR.CREATE_BUTTON);
     }
 
+    @Step("Open Create Clan Modal")
     async openCreateClanModal(){
         await this.createButton.click();
         await this.createClanModal.waitForVisible();
         return this.createClanModal;
     }
 
+    @Step("Expect Group Preview Visible For")
     async expectGroupPreviewVisibleFor(
         targetId: string,
         timeout = this.DEFAULT_TIMEOUT

@@ -117,21 +117,26 @@ export const config: Options.Testrunner = {
     reporters: [
         "spec",
         "dot",
-        // [
-        //     "allure",
-        //     {
-        //         outputDir: "allure-results",
-        //         disableWebdriverStepsReporting: true,
-        //         disableWebdriverScreenshotsReporting: false,
-        //         useCucumberStepReporter: true,
-        //         addConsoleLogs: isCI,
-        //         reportedEnvironmentVars: {
-        //             platform: process.env.PLATFORM ?? "local",
-        //             device: process.env.DEVICE ?? "emulator",
-        //             appVersion: process.env.APP_VERSION ?? "unknown",
-        //         },
-        //     },
-        // ],
+        [
+            "allure",
+            {
+                outputDir: "allure-results",
+                disableWebdriverStepsReporting: false,
+                disableWebdriverScreenshotsReporting: true,
+                addConsoleLogs: true,
+                issueLinkTemplate: "https://github.com/mezonai/mezon/issues/{}",
+                tmsLinkTemplate:
+                    "https://ops.nccsoft.vn/DefaultCollection/mezon/_boards/board/t/Mezon-Automation%20team/Backlog%20items/?workitem={}",
+            },
+        ],
+        [
+            "video",
+            {
+                saveAllVideos: true,
+                videoSlowdownMultiplier: 3,
+                outputDir: "./reports/videos",
+            },
+        ],
     ],
 
     // Options to be passed to Mocha.
@@ -153,6 +158,69 @@ export const config: Options.Testrunner = {
     // resolved to continue.
     //
     /**
-     * NOTE: No Hooks are used in this project, but feel free to add them if you need them.
+     * NOTE: Hooks added to attach video and screenshots into Allure
      */
+    afterTest: async function (test, _context, { error, passed }) {
+        try {
+            const fs = await import("node:fs");
+            const path = await import("node:path");
+            const allureReporter = (await import("@wdio/allure-reporter"))
+                .default;
+
+            // Always attach a screenshot on failure
+            if (!passed) {
+                try {
+                    const screenshot = await browser.takeScreenshot();
+                    allureReporter.addAttachment(
+                        "Screenshot",
+                        Buffer.from(screenshot, "base64"),
+                        "image/png"
+                    );
+                } catch {}
+            }
+
+            // Try to find and attach the test video (wdio-video-reporter) only when failed
+            if (!passed) {
+                try {
+                    const videosDir = path.resolve(process.cwd(), "./reports/videos");
+                    if (fs.existsSync(videosDir)) {
+                        const entries = fs.readdirSync(videosDir);
+                        const videoFiles = entries
+                            .filter((f) => f.endsWith(".webm") || f.endsWith(".mp4"))
+                            .map((name) => ({
+                                name,
+                                fullPath: path.join(videosDir, name),
+                                stat: fs.statSync(path.join(videosDir, name)),
+                            }))
+                            .sort((a, b) => b.stat.mtimeMs - a.stat.mtimeMs);
+
+                        if (videoFiles.length > 0) {
+                            const latest = videoFiles[0];
+                            const mime = latest.name.endsWith(".mp4")
+                                ? "video/mp4"
+                                : "video/webm";
+                            const data = fs.readFileSync(latest.fullPath);
+                            allureReporter.addAttachment("Test Video", data, mime);
+                        }
+                    }
+                } catch {}
+            }
+
+            // Optionally attach error details as JSON for quick view
+            if (error) {
+                try {
+                    const details = JSON.stringify(
+                        { message: error.message, stack: error.stack },
+                        null,
+                        2
+                    );
+                    allureReporter.addAttachment(
+                        "Error Details",
+                        details,
+                        "application/json"
+                    );
+                } catch {}
+            }
+        } catch {}
+    },
 };

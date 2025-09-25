@@ -138,5 +138,3 @@ export class Media {
         }
     }
 }
-
-export default Media;

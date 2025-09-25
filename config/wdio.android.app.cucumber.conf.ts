@@ -77,4 +77,51 @@ export const config: WebdriverIO.Config = {
             "appium:newCommandTimeout": 240,
         },
     ],
+    
+    // Attach media to Allure for failed scenarios
+    afterScenario: async function (_world, result) {
+        try {
+            const fs = await import("node:fs");
+            const path = await import("node:path");
+            const allureReporter = (await import("@wdio/allure-reporter")).default;
+
+            const passed = (result as any)?.passed === true;
+
+            if (!passed) {
+                try {
+                    const screenshot = await browser.takeScreenshot();
+                    allureReporter.addAttachment(
+                        "Screenshot",
+                        Buffer.from(screenshot, "base64"),
+                        "image/png"
+                    );
+                } catch {}
+
+                // Attach latest video created by wdio-video-reporter
+                try {
+                    const videosDir = path.resolve(process.cwd(), "./reports/videos");
+                    if (fs.existsSync(videosDir)) {
+                        const entries = fs.readdirSync(videosDir);
+                        const videoFiles = entries
+                            .filter((f) => f.endsWith(".webm") || f.endsWith(".mp4"))
+                            .map((name) => ({
+                                name,
+                                fullPath: path.join(videosDir, name),
+                                stat: fs.statSync(path.join(videosDir, name)),
+                            }))
+                            .sort((a, b) => b.stat.mtimeMs - a.stat.mtimeMs);
+
+                        if (videoFiles.length > 0) {
+                            const latest = videoFiles[0];
+                            const mime = latest.name.endsWith(".mp4")
+                                ? "video/mp4"
+                                : "video/webm";
+                            const data = fs.readFileSync(latest.fullPath);
+                            allureReporter.addAttachment("Test Video", data, mime);
+                        }
+                    }
+                } catch {}
+            }
+        } catch {}
+    },
 };

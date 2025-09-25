@@ -31,5 +31,3 @@ export class Clipboard {
         await driver.setClipboard(text as any);
     }
 }
-
-export default Clipboard;
