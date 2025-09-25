@@ -1,4 +1,6 @@
 import { Email, InboxDto, MailSlurp } from "mailslurp-client";
+import fs from "node:fs/promises";
+import path from "node:path";
 
 type CleanupStrategy = "delete" | "empty" | "none";
 type LogLevel = "debug" | "info" | "warn" | "error";
@@ -18,6 +20,10 @@ export interface MailslurpLifecycleOptions {
     cleanup?: CleanupStrategy;
     otpParser?: OtpParser;
     logger?: Logger;
+    reuse?: boolean;
+    storageDir?: string;
+    storageKey?: string;
+    preferredEmailAddress?: string;
 }
 
 class MailSlurpNotInitializedError extends Error {
@@ -66,15 +72,23 @@ export class MailslurpLifecycle {
     private readonly cleanup: CleanupStrategy;
     private otpParser: OtpParser;
     private readonly logger: Logger;
+    private readonly reuse: boolean;
+    private readonly storageDir: string;
+    private readonly storageKey: string;
+    private readonly preferredEmailAddress?: string;
 
     constructor(options: MailslurpLifecycleOptions = {}) {
         const {
             apiKey = process.env.MAILSLURP_API_KEY!,
             timeoutMs = 60_000,
             unreadOnly = true,
-            cleanup = "delete",
+            cleanup,
             otpParser = parseSixDigitOtp,
             logger,
+            reuse = process.env.MAILSLURP_REUSE === "1",
+            storageDir = process.env.MAILSLURP_STORE_DIR || ".mailslurp",
+            storageKey = process.env.MAILSLURP_STORE_KEY || "default",
+            preferredEmailAddress = process.env.MAILSLURP_EMAIL_ADDRESS,
         } = options;
 
         if (!apiKey) throw new Error("MAILSLURP_API_KEY is required");
@@ -82,7 +96,13 @@ export class MailslurpLifecycle {
         this.mailslurp = new MailSlurp({ apiKey });
         this.timeoutMs = timeoutMs;
         this.unreadOnly = unreadOnly;
-        this.cleanup = cleanup;
+        this.reuse = !!reuse;
+        this.storageDir = storageDir;
+        this.storageKey = storageKey;
+        this.preferredEmailAddress = preferredEmailAddress;
+        const resolvedCleanup: CleanupStrategy =
+            cleanup ?? (this.reuse ? "empty" : "delete");
+        this.cleanup = resolvedCleanup;
         this.otpParser = otpParser;
         this.logger = logger || {
             error: (...args) => defaultLogger("error", ...args),
@@ -107,15 +127,96 @@ export class MailslurpLifecycle {
         }
     }
 
+    private getStoreFilePath(): string {
+        const dir = path.resolve(process.cwd(), this.storageDir);
+        return path.join(dir, `${this.storageKey}.json`);
+    }
+
+    private async ensureStoreDir(): Promise<void> {
+        const dir = path.resolve(process.cwd(), this.storageDir);
+        await fs.mkdir(dir, { recursive: true });
+    }
+
+    private async loadStoredInboxMeta(): Promise<{ id: string; emailAddress: string } | null> {
+        try {
+            const filePath = this.getStoreFilePath();
+            const json = await fs.readFile(filePath, "utf-8");
+            const data = JSON.parse(json);
+            if (data && typeof data.id === "string" && typeof data.emailAddress === "string") {
+                return { id: data.id, emailAddress: data.emailAddress };
+            }
+            return null;
+        } catch (err) {
+            return null;
+        }
+    }
+
+    private async saveStoredInboxMeta(inbox: InboxDto): Promise<void> {
+        await this.ensureStoreDir();
+        const filePath = this.getStoreFilePath();
+        const payload = {
+            id: inbox.id,
+            emailAddress: inbox.emailAddress,
+        };
+        await fs.writeFile(filePath, JSON.stringify(payload, null, 2), "utf-8");
+    }
+
+    private async removeStoredInboxMeta(): Promise<void> {
+        try {
+            const filePath = this.getStoreFilePath();
+            await fs.rm(filePath, { force: true });
+        } catch (err) {
+            // ignore
+        }
+    }
+
     async init(): Promise<void> {
         if (!this.mailslurp) throw new MailSlurpNotInitializedError();
-        this.inbox = await this.mailslurp.createInbox();
-        this.logger.debug &&
-            this.logger.debug(
-                "Inbox created",
-                this.inbox.id,
-                this.inbox.emailAddress
-            );
+
+        if (this.reuse) {
+            const stored = await this.loadStoredInboxMeta();
+            if (stored?.id) {
+                try {
+                    this.inbox = await this.mailslurp.getInbox(stored.id);
+                    this.logger.debug &&
+                        this.logger.debug(
+                            "Reusable inbox loaded",
+                            this.inbox.id,
+                            this.inbox.emailAddress
+                        );
+                } catch (err) {
+                    this.logger.debug && this.logger.debug("Stored inbox not found, will create new");
+                }
+            }
+        }
+
+        if (!this.inbox) {
+            try {
+                if (this.preferredEmailAddress) {
+                    this.inbox = await this.mailslurp.createInboxWithOptions({
+                        emailAddress: this.preferredEmailAddress,
+                    } as any);
+                } else {
+                    this.inbox = await this.mailslurp.createInbox();
+                }
+            } catch (err) {
+                // fallback to default create if options fail
+                if (!this.inbox) {
+                    this.inbox = await this.mailslurp.createInbox();
+                }
+            }
+
+            if (this.reuse) {
+                await this.saveStoredInboxMeta(this.inbox);
+            }
+
+            this.logger.debug &&
+                this.logger.debug(
+                    "Inbox created",
+                    this.inbox.id,
+                    this.inbox.emailAddress
+                );
+        }
     }
 
     public async deleteInbox(): Promise<void> {
@@ -127,11 +228,25 @@ export class MailslurpLifecycle {
     async dispose(): Promise<void> {
         if (!this.mailslurp) throw new MailSlurpNotInitializedError();
         if (!this.inbox) return;
-        this.cleanup === "delete"
-            ? await this.mailslurp.deleteInbox(this.inbox.id!)
-            : await this.mailslurp.emptyInbox(this.inbox.id!);
+
+        const effectiveCleanup: CleanupStrategy =
+            this.reuse && this.cleanup === "delete" ? "empty" : this.cleanup;
+
+        if (effectiveCleanup === "delete") {
+            await this.mailslurp.deleteInbox(this.inbox.id!);
+            await this.removeStoredInboxMeta();
+        } else if (effectiveCleanup === "empty") {
+            await this.mailslurp.emptyInbox(this.inbox.id!);
+        } else {
+            // none: no-op
+        }
+
         this.logger.debug &&
-            this.logger.debug("Inbox cleaned up", this.inbox.id, this.cleanup);
+            this.logger.debug(
+                "Inbox cleaned up",
+                this.inbox.id,
+                effectiveCleanup
+            );
     }
 
     setOtpParser(parser: OtpParser) {
@@ -144,7 +259,10 @@ export class MailslurpLifecycle {
     }
 
     async getEmailAddress(): Promise<string> {
-        if (!this.inbox) throw new InboxNotCreatedError();
+        if (!this.inbox) {
+            this.logger.debug("Inbox not created");
+            throw new InboxNotCreatedError();
+        }
         return this.inbox.emailAddress as string;
     }
 

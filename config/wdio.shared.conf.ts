@@ -1,4 +1,7 @@
-import type { Options } from '@wdio/types';
+import type { Options } from "@wdio/types";
+// const allure = require("allure-commandline");
+
+const isCI = !!process.env.CI;
 
 /**
  * All not needed configurations, for this boilerplate, are removed.
@@ -23,6 +26,8 @@ export const config: Options.Testrunner = {
     /**
      * NOTE: This is just a place holder and will be overwritten by each specific configuration
      */
+    runner: "local",
+    maxInstances: 1,
     specs: [],
     //
     // ============
@@ -45,7 +50,7 @@ export const config: Options.Testrunner = {
     // Define all options that are relevant for the WebdriverIO instance here
     //
     // Level of logging verbosity: trace | debug | info | warn | error | silent
-    logLevel: 'debug',
+    logLevel: "debug",
     // Set specific log levels per logger
     // loggers:
     // - webdriver, webdriverio
@@ -67,7 +72,7 @@ export const config: Options.Testrunner = {
     // with `/`, the base url gets prepended, not including the path portion of your baseUrl.
     // If your `url` parameter starts without a scheme or `/` (like `some/path`), the base url
     // gets prepended directly.
-    baseUrl: 'http://the-internet.herokuapp.com',
+    baseUrl: "http://the-internet.herokuapp.com",
     // Default timeout for all waitFor* commands.
     /**
      * NOTE: This has been increased for more stable Appium Native app
@@ -96,7 +101,7 @@ export const config: Options.Testrunner = {
     //
     // Make sure you have the wdio adapter package for the specific framework installed
     // before running any tests.
-    framework: 'mocha',
+    framework: "mocha",
     // The number of times to retry the entire spec file when it fails as a whole
     // specFileRetries: 1,
     //
@@ -109,10 +114,29 @@ export const config: Options.Testrunner = {
     // Test reporter for stdout.
     // The only one supported by default is 'dot'
     // see also: https://webdriver.io/docs/dot-reporter
-    reporters: ['spec'],
+    reporters: [
+        "spec",
+        "dot",
+        // [
+        //     "allure",
+        //     {
+        //         outputDir: "allure-results",
+        //         disableWebdriverStepsReporting: true,
+        //         disableWebdriverScreenshotsReporting: false,
+        //         useCucumberStepReporter: true,
+        //         addConsoleLogs: isCI,
+        //         reportedEnvironmentVars: {
+        //             platform: process.env.PLATFORM ?? "local",
+        //             device: process.env.DEVICE ?? "emulator",
+        //             appVersion: process.env.APP_VERSION ?? "unknown",
+        //         },
+        //     },
+        // ],
+    ],
+
     // Options to be passed to Mocha.
     mochaOpts: {
-        ui: 'bdd',
+        ui: "bdd",
         /**
          * NOTE: This has been increased for more stable Appium Native app
          * tests because they can take a bit longer.

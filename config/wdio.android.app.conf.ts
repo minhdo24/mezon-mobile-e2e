@@ -1,4 +1,3 @@
-import { join } from "node:path";
 import { config as baseConfig } from "./wdio.shared.local.appium.conf.js";
 
 export const config: WebdriverIO.Config = {
@@ -25,21 +24,27 @@ export const config: WebdriverIO.Config = {
             //
             // NOTE: Change this name according to the Emulator you have created on your local machine
             "appium:deviceName": "Pixel_8_Pro_Android_15_API_35",
+            "appium:udid": "emulator-5554",
+            "appium:avd": "Pixel_8_Pro_Android_15_API_35",
             //
             // NOTE: Change this version according to the Emulator you have created on your local machine
             "appium:platformVersion": "15.0",
             "appium:orientation": "PORTRAIT",
             "appium:automationName": "UiAutomator2",
-            // The path to the app
-            "appium:app": join(
-                process.cwd(),
-                "apps",
-                //
-                // NOTE: Change this name according to the app version you downloaded
-                "mezon-1009.apk"
-            ),
             "appium:appWaitActivity": "com.mezon.mobile.MainActivity",
+            "appium:appPackage": "com.mezon.mobile",
+            "appium:appActivity": ".MainActivity",
             "appium:newCommandTimeout": 240,
+            "appium:autoGrantPermissions": true,
+            // fast start
+            "appium:skipDeviceInitialization": true,
+            "appium:skipServerInstallation": true,
+            "appium:disableWindowAnimation": true,
+            // keep data app to not login again (bypass persist)
+            "appium:noReset": true,
+            "appium:fullReset": false,
+            "appium:autoLaunch": false,
+            "appium:dontStopAppOnReset": true,
         },
     ],
 };

@@ -67,6 +67,9 @@
         "ts-node": "^10.9.2",
         "typescript": "^5.7.3",
         "wdio-lambdatest-service": "^4.0.0",
-        "mailslurp-client": "16.0.0"
+        "mailslurp-client": "16.0.0",
+        "@wdio/reporter": "9.19.2",
+        "allure-js-commons": "^3.3.3",
+        "allure-commandline": "2.34.1"
     }
 }

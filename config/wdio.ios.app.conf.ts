@@ -40,9 +40,16 @@ export const config: WebdriverIO.Config = {
                 // Change this name according to the app version you downloaded
                 "ios.simulator.wdio.native.app.v1.0.8.zip"
             ),
+            "appium:appPackage": "com.mezon.mobile",
+            "appium:appActivity": ".MainActivity",
             "appium:newCommandTimeout": 240,
             // This is needed to wait for the webview context to become available
             "appium:webviewConnectTimeout": 5000,
+            // keep data app to not login again (bypass persist)
+            "appium:noReset": true,
+            "appium:fullReset": false,
+            "appium:autoLaunch": false,
+            "appium:dontStopAppOnReset": true,
         },
     ],
 };

@@ -1,6 +1,4 @@
-import WebView, { CONTEXT_REF } from "../helpers/WebView.js";
-
-export class AuthScreen extends WebView {
+export class AuthScreen {
     static init() {
         return new AuthScreen();
     }
@@ -8,85 +6,57 @@ export class AuthScreen extends WebView {
     static async using<T>(fn: (auth: AuthScreen) => Promise<T>): Promise<T> {
         return fn(AuthScreen.init());
     }
-    private constructor() {
-        super();
+
+    private constructor() {}
+
+    private get rootAuth() {
+        return $("~rootAuth.stack");
+    }
+    private get bottomWrapper() {
+        return $("~bottomNavigatorWrapper");
+    }
+    private get loginScreen() {
+        return $("~login.screen");
+    }
+    private get otpScreen() {
+        return $("~otp.screen");
+    }
+    private tab(name: "home" | "messages" | "notifications" | "profile") {
+        const map: Record<string, string> = {
+            home: "bottomTab.home",
+            messages: "bottomTab.messages",
+            notifications: "bottomTab.notifications",
+            profile: "bottomTab.profile",
+        };
+        return $(`~${map[name]}`);
     }
 
-    async waitForIsShown(isShown = true): Promise<boolean | void> {
-        const selector = browser.isAndroid
-            ? "*//android.webkit.WebView"
-            : "*//XCUIElementTypeWebView";
-
-        return $(selector).waitForDisplayed({
-            timeout: 45000,
-            reverse: !isShown,
-        });
+    // States
+    async waitForUnauthenticated(timeout = 45000): Promise<void> {
+        await this.loginScreen.waitForDisplayed({ timeout });
     }
 
-    async switchToFirstWebview(): Promise<void> {
-        await this.waitForWebViewContextAdded();
-
-        const contexts = await driver.getContexts({
-            returnAndroidDescriptionData: true,
-            returnDetailedContexts: true,
-        });
-
-        const webviewContext = contexts.find((ctx) => {
-            const id = typeof ctx === "string" ? ctx : ctx?.id;
-            return (
-                typeof id === "string" && id.toUpperCase().startsWith("WEBVIEW")
-            );
-        });
-
-        const contextId =
-            typeof webviewContext === "string"
-                ? webviewContext
-                : webviewContext?.id;
-        if (!contextId) {
-            throw new Error("No WEBVIEW context found");
-        }
-
-        await driver.switchContext(contextId);
+    async waitForOtp(timeout = 45000): Promise<void> {
+        await this.otpScreen.waitForDisplayed({ timeout });
     }
 
-    async switchBackToNative(): Promise<void> {
-        await driver.switchContext(CONTEXT_REF.NATIVE_APP);
+    async waitForAuthenticated(timeout = 60000): Promise<void> {
+        await this.tab("home").waitForDisplayed({ timeout });
     }
 
-    async getCurrentWebviewUrl(): Promise<string> {
-        const originalContext = await driver.getContext();
-        await this.switchToFirstWebview();
-        const href = await driver.execute(() => window.location.href);
-        originalContext
-            ? await driver.switchContext(originalContext)
-            : await this.switchBackToNative();
-
-        return href;
+    async goToTab(
+        name: "home" | "messages" | "notifications" | "profile"
+    ): Promise<void> {
+        const el = await this.tab(name);
+        await el.waitForDisplayed({ timeout: 20000 });
+        await el.click();
     }
 
-    async waitForUrlContains(part: string, timeout = 20000): Promise<void> {
-        await this.switchToFirstWebview();
-        await driver.waitUntil(
-            async () => {
-                const href = await driver.execute(() => window.location.href);
-                return href.includes(part);
-            },
-            {
-                timeout,
-                timeoutMsg: `URL did not include "${part}" after ${timeout}ms`,
-                interval: 250,
-            }
-        );
-        await this.switchBackToNative();
+    async expectOnHome(): Promise<void> {
+        await expect(this.tab("home")).toBeDisplayed();
     }
 
-    async getAuthQueryParam(paramName = "code"): Promise<string | null> {
-        await this.switchToFirstWebview();
-        const href = await driver.execute(() => window.location.href);
-        const query = href.split("?")[1] || "";
-        const params = new URLSearchParams(query);
-        const value = params.get(paramName);
-        await this.switchBackToNative();
-        return value;
+    async expectOnMessages(): Promise<void> {
+        await expect(this.tab("messages")).toBeDisplayed();
     }
 }

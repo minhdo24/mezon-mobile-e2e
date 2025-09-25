@@ -71,7 +71,7 @@ export const config: WebdriverIO.Config = {
                 "apps",
                 //
                 // NOTE: Change this name according to the app version you downloaded
-                "mezon-1009.apk"
+                "app-debug.apk"
             ),
             "appium:appWaitActivity": "com.wdiodemoapp.MainActivity",
             "appium:newCommandTimeout": 240,

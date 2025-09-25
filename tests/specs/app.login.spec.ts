@@ -1,7 +1,10 @@
-import { MezonLoginScreen, AuthScreen } from "../screenobjects/index.js";
+import { MezonLoginScreen } from "../screenobjects/index.js";
 import { MailslurpLifecycle } from "../helpers/mailslurp.js";
+import { sleep } from "../utils/sleep.js";
 
-describe("Mezon Login (WebView)", function () {
+import { HomeScreen } from "../screenobjects/home/home.screen.js";
+
+describe("Mezon Login (Native)", function () {
     let mezonLoginScreen: MezonLoginScreen;
     beforeEach(async () => {
         mezonLoginScreen = await MezonLoginScreen.using(async (ms) => {
@@ -10,18 +13,7 @@ describe("Mezon Login (WebView)", function () {
         });
     });
 
-    // it("Login with Email/Password (OAuth2 redirect has code)", async function () {
-    //     const email = process.env.E2E_MEZON_EMAIL;
-    //     const password = process.env.E2E_MEZON_PASSWORD;
-    //     if (!email || !password) this.skip();
-
-    //     await MezonLoginScreen.login(email!, password!);
-    //     await AuthScreen.waitForUrlContains("code=");
-    //     const code = await AuthScreen.getAuthQueryParam("code");
-    //     await expect(code).toBeTruthy();
-    // });
-
-    it("Login with OTP via MailSlurp", async function () {
+    it.only("Login with OTP via MailSlurp", async function () {
         if (!process.env.MAILSLURP_API_KEY) this.skip();
 
         await MailslurpLifecycle.using(
@@ -31,13 +23,26 @@ describe("Mezon Login (WebView)", function () {
                 const otp = await ms.waitForOtp();
                 await mezonLoginScreen.submitOtp(otp);
             },
-            { cleanup: "delete" }
+            {
+                reuse: true,
+                cleanup: "empty",
+                storageDir: ".mailslurp",
+                storageKey: "login",
+            }
         );
-        const authScreen = await AuthScreen.using(async (as) => {
-            await as.waitForUrlContains("code=");
-            return as;
+        await sleep(5000);
+        await HomeScreen.using(async (home) => {
+            const createClanModal = await home.openCreateClanModal();
+            await createClanModal.setClanName(`Test Clan${Date.now()}`);
+            await createClanModal.uploadImage(async (upload) => {
+                const smallAvatarPath = await upload.createFileWithSize(
+                    `small_avatar_${Date.now()}`,
+                    800 * 1024,
+                    "jpg"
+                );
+                return smallAvatarPath;
+            });
+            await createClanModal.createClan();
         });
-        const code = await authScreen.getAuthQueryParam("code");
-        await expect(code).toBeTruthy();
     });
 });
