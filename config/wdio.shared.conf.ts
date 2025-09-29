@@ -1,7 +1,14 @@
 import type { Options } from "@wdio/types";
-// const allure = require("allure-commandline");
+import { MultiRemoteProvider } from "../tests/manage-drive/provider.js";
+import { installSessionScopedGlobals } from "../tests/manage-drive/session-scoped-globals.js";
+import { capabilities } from "../tests/manage-drive/capabilities.js";
 
 const isCI = !!process.env.CI;
+
+declare global {
+    var mr: MultiRemoteProvider<keyof typeof capabilities>;
+}
+let uninstall: (() => void) | undefined;
 
 /**
  * All not needed configurations, for this boilerplate, are removed.
@@ -27,7 +34,11 @@ export const config: Options.Testrunner = {
      * NOTE: This is just a place holder and will be overwritten by each specific configuration
      */
     runner: "local",
-    maxInstances: 1,
+    hostname: "127.0.0.1",
+    port: 4727,
+    path: "/",
+
+    maxInstances: 2,
     specs: [],
     //
     // ============
@@ -94,7 +105,21 @@ export const config: Options.Testrunner = {
     // - wdio.shared.local.appium.conf.ts
     // - wdio.shared.sauce.conf.ts
     // configuration files
-    services: [],
+    services: [
+        [
+            "appium",
+            {
+                command: "appium",
+                args: {
+                    address: "127.0.0.1",
+                    port: 4727,
+                    basePath: "/",
+                    relaxedSecurity: true,
+                    allowCors: true,
+                },
+            },
+        ],
+    ],
     // Framework you want to run your specs with.
     // The following are supported: Mocha, Jasmine, and Cucumber
     // see also: https://webdriver.io/docs/frameworks
@@ -182,11 +207,16 @@ export const config: Options.Testrunner = {
             // Try to find and attach the test video (wdio-video-reporter) only when failed
             if (!passed) {
                 try {
-                    const videosDir = path.resolve(process.cwd(), "./reports/videos");
+                    const videosDir = path.resolve(
+                        process.cwd(),
+                        "./reports/videos"
+                    );
                     if (fs.existsSync(videosDir)) {
                         const entries = fs.readdirSync(videosDir);
                         const videoFiles = entries
-                            .filter((f) => f.endsWith(".webm") || f.endsWith(".mp4"))
+                            .filter(
+                                (f) => f.endsWith(".webm") || f.endsWith(".mp4")
+                            )
                             .map((name) => ({
                                 name,
                                 fullPath: path.join(videosDir, name),
@@ -200,7 +230,11 @@ export const config: Options.Testrunner = {
                                 ? "video/mp4"
                                 : "video/webm";
                             const data = fs.readFileSync(latest.fullPath);
-                            allureReporter.addAttachment("Test Video", data, mime);
+                            allureReporter.addAttachment(
+                                "Test Video",
+                                data,
+                                mime
+                            );
                         }
                     }
                 } catch {}
@@ -222,5 +256,22 @@ export const config: Options.Testrunner = {
                 } catch {}
             }
         } catch {}
+    },
+
+    before() {
+        const mr = MultiRemoteProvider.from();
+        global.mr = mr;
+        uninstall = installSessionScopedGlobals(mr.all());
+    },
+    after() {
+        uninstall?.();
+    },
+
+    autoCompileOpts: {
+        tsNodeOpts: {
+            transpileOnly: true,
+            esm: true,
+            project: "./tsconfig.json",
+        },
     },
 };

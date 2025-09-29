@@ -1,4 +1,5 @@
 export class MezonLoginScreen {
+    private email: string;
     static init() {
         return new MezonLoginScreen();
     }
@@ -78,10 +79,8 @@ export class MezonLoginScreen {
     }
 
     async requestOtpFor(email: string): Promise<void> {
+        this.email = email;
         await this.waitForIsShown(true);
-        if (await this.switchOtpLink.isExisting()) {
-            await this.switchOtpLink.click();
-        }
         await this.setEmail(email);
         await this.primaryButton.click();
     }

@@ -4,3 +4,4 @@ export * from "./home.screen.js";
 export * from "./ChannelCreator.js";
 export * from "./CategoryMenu.js";
 export * from "./gestures.js";
+export * from "./clan-menu/index.js";

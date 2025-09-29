@@ -27,6 +27,7 @@ export class ListClanPopupComponent {
         return el;
     }
 
+    @Step("Wait for List Clan Popup Visible")
     async waitForVisible(timeout = this.DEFAULT_TIMEOUT) {
         await this.show(SELECTOR.CREATE_BUTTON, timeout);
     }
